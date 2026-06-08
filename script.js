@@ -249,6 +249,20 @@ const playAI = async () => {
 };
 
 // UI Handlers
+const updateSelectionUI = () => {
+    // Play as
+    document.getElementById('select-black').classList.toggle('active', userColor === BLACK);
+    document.getElementById('select-white').classList.toggle('active', userColor === WHITE);
+    
+    // Start mode
+    document.getElementById('start-gp').classList.toggle('active', startMode === START_GP);
+    document.getElementById('start-normal').classList.toggle('active', startMode === START_NORMAL);
+    
+    // AI Engine
+    document.getElementById('engine-standard').classList.toggle('active', aiEngine === 'standard');
+    document.getElementById('engine-pattern').classList.toggle('active', aiEngine === 'pattern');
+};
+
 restartBtn.onclick = () => {
     if (gameState === 'setup') {
         startGame();
@@ -261,8 +275,7 @@ document.getElementById('select-black').onclick = () => {
     if (userColor === BLACK || gameState === 'playing') return;
     userColor = BLACK;
     aiColor = WHITE;
-    document.getElementById('select-black').classList.add('active');
-    document.getElementById('select-white').classList.remove('active');
+    updateSelectionUI();
     initGame();
 };
 
@@ -270,39 +283,35 @@ document.getElementById('select-white').onclick = () => {
     if (userColor === WHITE || gameState === 'playing') return;
     userColor = WHITE;
     aiColor = BLACK;
-    document.getElementById('select-white').classList.add('active');
-    document.getElementById('select-black').classList.remove('active');
+    updateSelectionUI();
     initGame();
 };
 
 document.getElementById('start-gp').onclick = () => {
     if (startMode === START_GP || gameState === 'playing') return;
     startMode = START_GP;
-    document.getElementById('start-gp').classList.add('active');
-    document.getElementById('start-normal').classList.remove('active');
+    updateSelectionUI();
     initGame();
 };
 
 document.getElementById('start-normal').onclick = () => {
     if (startMode === START_NORMAL || gameState === 'playing') return;
     startMode = START_NORMAL;
-    document.getElementById('start-normal').classList.add('active');
-    document.getElementById('start-gp').classList.remove('active');
+    updateSelectionUI();
     initGame();
 };
 
 document.getElementById('engine-standard').onclick = () => {
     if (aiEngine === 'standard' || gameState === 'playing') return;
     aiEngine = 'standard';
-    document.getElementById('engine-standard').classList.add('active');
-    document.getElementById('engine-pattern').classList.remove('active');
+    updateSelectionUI();
 };
 
 document.getElementById('engine-pattern').onclick = () => {
     if (aiEngine === 'pattern' || gameState === 'playing') return;
     aiEngine = 'pattern';
-    document.getElementById('engine-pattern').classList.add('active');
-    document.getElementById('engine-standard').classList.remove('active');
+    updateSelectionUI();
 };
 
 initGame();
+updateSelectionUI();
