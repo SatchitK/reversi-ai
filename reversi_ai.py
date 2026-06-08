@@ -2,7 +2,8 @@
 reversi_ai.py
 
 State-of-the-Art AI Engine for Reversi using Bitboards, Iterative Deepening, 
-Alpha-Beta pruning, Transposition Tables, and Mobility/Positional Heuristics.
+Principal Variation Search (PVS), History Heuristics, Transposition Tables, 
+and refined Mobility/Positional/Frontier heuristics.
 """
 
 import time
@@ -20,11 +21,13 @@ WEIGHTS = [
     [100, -20, 10,  5,  5, 10, -20, 100]
 ]
 
-# Map single bit values to weight for O(1) positional evaluation
-FLAT_WEIGHTS_DICT = {}
+# Precomputed masks for vectorized evaluation
+WEIGHT_MASKS = {}
 for r in range(8):
     for c in range(8):
-        FLAT_WEIGHTS_DICT[1 << (r * 8 + c)] = WEIGHTS[r][c]
+        w = WEIGHTS[r][c]
+        WEIGHT_MASKS[w] = WEIGHT_MASKS.get(w, 0) | (1 << (r * 8 + c))
+OPTIMIZED_WEIGHTS = list(WEIGHT_MASKS.items())
 
 # Masks for bitboard directional shifting
 MASKS = [
@@ -78,62 +81,86 @@ def make_move_bb(P, O, move):
                 flip |= c
     return P ^ move ^ flip, O ^ flip
 
+def get_frontier_bb(P, O):
+    """Get bitboard of discs adjacent to empty squares."""
+    E = ~(P | O) & 0xFFFFFFFFFFFFFFFF
+    N = ((E << 1) & 0xFEFEFEFEFEFEFEFE) | \
+        ((E >> 1) & 0x7F7F7F7F7F7F7F7F) | \
+        (E << 8) | (E >> 8) | \
+        ((E << 7) & 0x7F7F7F7F7F7F7F7F) | \
+        ((E >> 7) & 0xFEFEFEFEFEFEFEFE) | \
+        ((E << 9) & 0xFEFEFEFEFEFEFEFE) | \
+        ((E >> 9) & 0x7F7F7F7F7F7F7F7F)
+    return P & N
+
 def count_bits(n):
     return bin(n).count('1')
 
 def evaluate_bb(P, O, phase):
-    """Heuristic evaluation function based on mobility, coins, and static weights."""
-    p_moves = count_bits(get_moves_bb(P, O))
-    o_moves = count_bits(get_moves_bb(O, P))
+    """Heuristic evaluation function based on mobility, coins, weights, and frontier discs."""
+    p_moves_bb = get_moves_bb(P, O)
+    o_moves_bb = get_moves_bb(O, P)
+    p_moves = count_bits(p_moves_bb)
+    o_moves = count_bits(o_moves_bb)
     
     # End game exact score: maximizing coin difference
     if phase == 64 or (p_moves == 0 and o_moves == 0):
         p_coins = count_bits(P)
         o_coins = count_bits(O)
-        if p_coins > o_coins: return 10000 + p_coins - o_coins
-        if p_coins < o_coins: return -10000 + p_coins - o_coins
+        if p_coins > o_coins: return 100000 + p_coins - o_coins
+        if p_coins < o_coins: return -100000 + p_coins - o_coins
         return 0
     
-    # Late game: prioritize coin parity and pure mobility
-    if phase > 50:
-        p_coins = count_bits(P)
-        o_coins = count_bits(O)
-        return (p_coins - o_coins) * 10 + (p_moves - o_moves) * 5
-    
-    # Mid game: positional weights + mobility
     score = 0
-    p_temp = P
-    while p_temp:
-        lsb = p_temp & -p_temp
-        score += FLAT_WEIGHTS_DICT.get(lsb, 0)
-        p_temp &= p_temp - 1
+    # Vectorized positional weights
+    for w, mask in OPTIMIZED_WEIGHTS:
+        score += (count_bits(P & mask) - count_bits(O & mask)) * w
         
-    o_temp = O
-    while o_temp:
-        lsb = o_temp & -o_temp
-        score -= FLAT_WEIGHTS_DICT.get(lsb, 0)
-        o_temp &= o_temp - 1
-        
-    mobility_score = (p_moves - o_moves) * 15
-    return score + mobility_score
+    # Mobility score: weighted higher in early/mid game
+    mobility_score = (p_moves - o_moves) * (20 if phase < 40 else 10)
+    
+    # Frontier score: fewer frontier discs is better
+    p_frontier = count_bits(get_frontier_bb(P, O))
+    o_frontier = count_bits(get_frontier_bb(O, P))
+    frontier_score = (o_frontier - p_frontier) * 5
+    
+    return score + mobility_score + frontier_score
 
 # Transposition Table Constants
 EXACT, LOWERBOUND, UPPERBOUND = 0, 1, 2
 
 class TranspositionTable:
-    def __init__(self):
+    def __init__(self, size_limit=100000):
         self.table = {}
+        self.size_limit = size_limit
         
     def store(self, P, O, depth, flag, eval_val, move):
+        if len(self.table) > self.size_limit:
+            # Simple cleanup: clear if full (could be more sophisticated)
+            self.table.clear()
         self.table[(P, O)] = (depth, flag, eval_val, move)
         
     def lookup(self, P, O):
         return self.table.get((P, O), None)
 
+class HistoryTable:
+    def __init__(self):
+        self.scores = [0] * 64
+        
+    def update(self, move_bb, depth):
+        idx = (move_bb & -move_bb).bit_length() - 1
+        if 0 <= idx < 64:
+            self.scores[idx] += depth * depth
+            
+    def get_score(self, move_bb):
+        idx = (move_bb & -move_bb).bit_length() - 1
+        return self.scores[idx] if 0 <= idx < 64 else 0
+
 TT = TranspositionTable()
+HISTORY = HistoryTable()
 
 def alphabeta(P, O, depth, alpha, beta, phase, start_time, time_limit):
-    """Minimax (Negamax) with Alpha-Beta pruning, move ordering, and transposition tables."""
+    """PVS (Principal Variation Search) with Alpha-Beta pruning, move ordering, and TT."""
     if time.time() - start_time > time_limit:
         raise TimeoutError
 
@@ -156,107 +183,97 @@ def alphabeta(P, O, depth, alpha, beta, phase, start_time, time_limit):
         opp_moves_bb = get_moves_bb(O, P)
         if opp_moves_bb == 0:
             return evaluate_bb(P, O, phase), None
-        
-        # Pass turn: the opponent gets to move
         val, _ = alphabeta(O, P, depth - 1, -beta, -alpha, phase, start_time, time_limit)
         return -val, None
         
-    best_move = None
-    best_val = float('-inf')
-    original_alpha = alpha
-    
-    # Move ordering: TT move first, then positional score
+    # Move ordering
     moves_list = []
     temp = moves_bb
     while temp:
         lsb = temp & -temp
-        score = FLAT_WEIGHTS_DICT.get(lsb, 0)
+        score = 0
         if lsb == tt_move:
-            score += 100000 # Try TT move first
+            score = 1000000
+        else:
+            # Combine static positional weight and history heuristic
+            idx = (lsb & -lsb).bit_length() - 1
+            score = WEIGHTS[idx // 8][idx % 8] + HISTORY.get_score(lsb)
         moves_list.append((score, lsb))
         temp &= temp - 1
-        
     moves_list.sort(reverse=True, key=lambda x: x[0])
     
-    for _, move in moves_list:
+    best_move = None
+    best_val = float('-inf')
+    original_alpha = alpha
+    
+    # PVS implementation
+    for i, (_, move) in enumerate(moves_list):
         new_P, new_O = make_move_bb(P, O, move)
-        try:
+        if i == 0:
+            # Full window search for the first move
             val, _ = alphabeta(new_O, new_P, depth - 1, -beta, -alpha, phase + 1, start_time, time_limit)
             val = -val
-        except TimeoutError:
-            raise
-            
+        else:
+            # Null window search for subsequent moves
+            val, _ = alphabeta(new_O, new_P, depth - 1, -alpha - 1, -alpha, phase + 1, start_time, time_limit)
+            val = -val
+            if alpha < val < beta:
+                # Re-search if null window search failed high
+                val, _ = alphabeta(new_O, new_P, depth - 1, -beta, -alpha, phase + 1, start_time, time_limit)
+                val = -val
+                
         if val > best_val:
             best_val = val
             best_move = move
-        alpha = max(alpha, val)
-        if alpha >= beta:
-            break
-            
-    if best_val <= original_alpha:
-        flag = UPPERBOUND
-    elif best_val >= beta:
-        flag = LOWERBOUND
-    else:
-        flag = EXACT
         
+        if val > alpha:
+            alpha = val
+            if alpha >= beta:
+                HISTORY.update(move, depth)
+                break
+            
+    flag = EXACT
+    if best_val <= original_alpha: flag = UPPERBOUND
+    elif best_val >= beta: flag = LOWERBOUND
+    
     TT.store(P, O, depth, flag, best_val, best_move)
     return best_val, best_move
 
 def board_to_bb(board):
-    black_bb = 0
-    white_bb = 0
+    black_bb = white_bb = 0
     for r in range(8):
         for c in range(8):
-            if board[r][c] == BLACK:
-                black_bb |= (1 << (r * 8 + c))
-            elif board[r][c] == WHITE:
-                white_bb |= (1 << (r * 8 + c))
+            if board[r][c] == BLACK: black_bb |= (1 << (r * 8 + c))
+            elif board[r][c] == WHITE: white_bb |= (1 << (r * 8 + c))
     return black_bb, white_bb
 
 def bb_to_move(move_bb):
-    if not move_bb:
-        return None
+    if not move_bb: return None
     idx = (move_bb & -move_bb).bit_length() - 1
     return (idx // 8, idx % 8)
 
 def get_best_move(game, player, time_limit=1.5, **kwargs):
-    global TT
-    TT = TranspositionTable() # Clear TT for fresh search to avoid unbounded memory growth
-    
     black_bb, white_bb = board_to_bb(game.board)
-    if player == BLACK:
-        P, O = black_bb, white_bb
-    else:
-        P, O = white_bb, black_bb
-        
+    P, O = (black_bb, white_bb) if player == BLACK else (white_bb, black_bb)
     phase = count_bits(P | O)
-    print(f"AI Thinking (Player {'Black' if player == BLACK else 'White'}) Phase {phase}...")
     
     start_time = time.time()
     best_move = None
     depth = 1
     
+    print(f"AI Thinking ({'Black' if player == BLACK else 'White'}) Phase {phase}...")
     try:
         while True:
             val, move_bb = alphabeta(P, O, depth, float('-inf'), float('inf'), phase, start_time, time_limit)
-            if move_bb is not None:
-                best_move = move_bb
-            # End game solver optimization
-            if phase + depth >= 64:
-                break
+            if move_bb: best_move = move_bb
+            if phase + depth >= 64: break
             depth += 1
     except TimeoutError:
         pass
         
     print(f"AI Reached Depth: {depth-1}")
-    
-    # Fallback to pure move generation if no move returned (e.g., instant timeout)
     if best_move is None:
         moves_bb = get_moves_bb(P, O)
-        if moves_bb:
-            best_move = moves_bb & -moves_bb
+        if moves_bb: best_move = moves_bb & -moves_bb
             
-    move = bb_to_move(best_move)
-    print(f"AI Selected Move: {move}")
-    return move
+    return bb_to_move(best_move)

@@ -3,15 +3,17 @@ const START_GP = 'gp', START_NORMAL = 'normal';
 const DIRS = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
 
 let board = [];
-let currentPlayer = BLACK; // Black always starts in Reversi
+let currentPlayer = BLACK; 
 let userColor = BLACK;
 let aiColor = WHITE;
 let isAiThinking = false;
 let startMode = START_GP;
-let gameStarted = false;
+let gameState = 'setup'; // 'setup' or 'playing'
+let lastMove = null; // Track the last move made [r, c]
 
 const boardEl = document.getElementById('board');
 const statusMsg = document.getElementById('status-message');
+const restartBtn = document.getElementById('restart-btn');
 const scores = {
     [BLACK]: document.getElementById('black-score'),
     [WHITE]: document.getElementById('white-score')
@@ -21,7 +23,38 @@ const scoreDivs = {
     [WHITE]: document.querySelector('.white-score')
 };
 
+// Persistent DOM elements for the board
+const cellElements = [];
+const discElements = [];
+
+const createBoard = () => {
+    boardEl.innerHTML = '';
+    cellElements.length = 0;
+    discElements.length = 0;
+    
+    for (let r = 0; r < 8; r++) {
+        cellElements[r] = [];
+        discElements[r] = [];
+        for (let c = 0; c < 8; c++) {
+            const cell = document.createElement('div');
+            cell.className = 'cell';
+            
+            const disc = document.createElement('div');
+            disc.className = 'cell-disc';
+            
+            cell.appendChild(disc);
+            cell.onclick = () => handleMove(r, c);
+            boardEl.appendChild(cell);
+            
+            cellElements[r][c] = cell;
+            discElements[r][c] = disc;
+        }
+    }
+};
+
 const initGame = () => {
+    if (cellElements.length === 0) createBoard();
+    
     board = Array.from({ length: 8 }, () => Array(8).fill(EMPTY));
     if (startMode === START_GP) {
         board[3][3] = BLACK;
@@ -36,16 +69,26 @@ const initGame = () => {
     }
     currentPlayer = BLACK;
     isAiThinking = false;
-    gameStarted = false;
+    gameState = 'setup';
+    lastMove = null;
     
-    // Enable controls
+    // UI state
     document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = false);
+    restartBtn.textContent = 'Start Game';
+    boardEl.classList.add('setup');
+    
+    render();
+};
+
+const startGame = () => {
+    gameState = 'playing';
+    document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
+    restartBtn.textContent = 'Restart Game';
+    boardEl.classList.remove('setup');
     
     render();
 
-    if (userColor === WHITE) {
-        gameStarted = true;
-        document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
+    if (currentPlayer === aiColor) {
         setTimeout(playAI, 500);
     }
 };
@@ -99,8 +142,7 @@ const applyMove = (r, c, player) => {
 };
 
 const render = () => {
-    boardEl.innerHTML = '';
-    const validMoves = (currentPlayer === userColor && !isAiThinking) ? getMoves(userColor) : [];
+    const validMoves = (gameState === 'playing' && currentPlayer === userColor && !isAiThinking) ? getMoves(userColor) : [];
     let counts = { [BLACK]: 0, [WHITE]: 0 };
 
     for (let r = 0; r < 8; r++) {
@@ -108,19 +150,19 @@ const render = () => {
             const val = board[r][c];
             if (val) counts[val]++;
 
-            const cell = document.createElement('div');
-            cell.className = 'cell';
+            const disc = discElements[r][c];
+            disc.className = 'cell-disc';
             
-            const disc = document.createElement('div');
-            disc.className = `cell-disc ${val === BLACK ? 'black' : val === WHITE ? 'white' : ''}`;
+            if (val === BLACK) disc.classList.add('black');
+            else if (val === WHITE) disc.classList.add('white');
+            
+            if (lastMove && lastMove[0] === r && lastMove[1] === c) {
+                disc.classList.add('last-move');
+            }
             
             if (val === EMPTY && validMoves.some(([mr, mc]) => mr === r && mc === c)) {
                 disc.classList.add('valid-move');
             }
-            
-            cell.appendChild(disc);
-            cell.onclick = () => handleMove(r, c);
-            boardEl.appendChild(cell);
         }
     }
 
@@ -129,6 +171,11 @@ const render = () => {
 
     scoreDivs[BLACK].classList.toggle('active', currentPlayer === BLACK);
     scoreDivs[WHITE].classList.toggle('active', currentPlayer === WHITE);
+
+    if (gameState === 'setup') {
+        statusMsg.textContent = "Select options and press Start";
+        return;
+    }
 
     const blackMoves = getMoves(BLACK).length;
     const whiteMoves = getMoves(WHITE).length;
@@ -145,19 +192,17 @@ const render = () => {
 };
 
 const handleMove = async (r, c) => {
-    if (isAiThinking || currentPlayer !== userColor || !applyMove(r, c, userColor)) return;
+    if (gameState !== 'playing' || isAiThinking || currentPlayer !== userColor || !applyMove(r, c, userColor)) return;
     
-    if (!gameStarted) {
-        gameStarted = true;
-        document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
-    }
-
+    lastMove = [r, c];
     currentPlayer = aiColor;
     render();
     setTimeout(playAI, 50);
 };
 
 const playAI = async () => {
+    if (gameState !== 'playing') return;
+    
     const moves = getMoves(aiColor);
     if (!moves.length) {
         currentPlayer = userColor;
@@ -175,7 +220,10 @@ const playAI = async () => {
             body: JSON.stringify({ board, player: aiColor })
         });
         const { move } = await res.json();
-        if (move) applyMove(move[0], move[1], aiColor);
+        if (move && gameState === 'playing') {
+            applyMove(move[0], move[1], aiColor);
+            lastMove = [move[0], move[1]];
+        }
     } catch (err) {
         console.error("AI Error:", err);
         statusMsg.textContent = "Connection error";
@@ -184,22 +232,32 @@ const playAI = async () => {
     isAiThinking = false;
     currentPlayer = userColor;
     
-    if (!getMoves(userColor).length && getMoves(aiColor).length) {
-        render();
-        setTimeout(() => {
-            currentPlayer = aiColor;
-            playAI();
-        }, 1000);
-    } else {
-        render();
+    if (gameState === 'playing') {
+        if (!getMoves(userColor).length && getMoves(aiColor).length) {
+            render();
+            setTimeout(() => {
+                if (gameState === 'playing') {
+                    currentPlayer = aiColor;
+                    playAI();
+                }
+            }, 1000);
+        } else {
+            render();
+        }
     }
 };
 
 // UI Handlers
-document.getElementById('restart-btn').onclick = initGame;
+restartBtn.onclick = () => {
+    if (gameState === 'setup') {
+        startGame();
+    } else {
+        initGame();
+    }
+};
 
 document.getElementById('select-black').onclick = () => {
-    if (userColor === BLACK || gameStarted) return;
+    if (userColor === BLACK || gameState === 'playing') return;
     userColor = BLACK;
     aiColor = WHITE;
     document.getElementById('select-black').classList.add('active');
@@ -208,7 +266,7 @@ document.getElementById('select-black').onclick = () => {
 };
 
 document.getElementById('select-white').onclick = () => {
-    if (userColor === WHITE || gameStarted) return;
+    if (userColor === WHITE || gameState === 'playing') return;
     userColor = WHITE;
     aiColor = BLACK;
     document.getElementById('select-white').classList.add('active');
@@ -217,7 +275,7 @@ document.getElementById('select-white').onclick = () => {
 };
 
 document.getElementById('start-gp').onclick = () => {
-    if (startMode === START_GP || gameStarted) return;
+    if (startMode === START_GP || gameState === 'playing') return;
     startMode = START_GP;
     document.getElementById('start-gp').classList.add('active');
     document.getElementById('start-normal').classList.remove('active');
@@ -225,7 +283,7 @@ document.getElementById('start-gp').onclick = () => {
 };
 
 document.getElementById('start-normal').onclick = () => {
-    if (startMode === START_NORMAL || gameStarted) return;
+    if (startMode === START_NORMAL || gameState === 'playing') return;
     startMode = START_NORMAL;
     document.getElementById('start-normal').classList.add('active');
     document.getElementById('start-gp').classList.remove('active');
