@@ -42,6 +42,9 @@ class ReversiGUI:
         
         self.turn_label = tk.Label(self.status_frame, text="Turn: Black", font=("Helvetica", 12))
         self.turn_label.pack(side=tk.RIGHT)
+        
+        self.footer_label = tk.Label(self.root, text="shayan matin sucks", font=("Helvetica", 16, "bold"), fg="red")
+        self.footer_label.pack(side=tk.BOTTOM, pady=10)
 
     def ask_player_color(self):
         response = messagebox.askyesno("Color Selection", "Do you want to play as Black? (Black moves first)")

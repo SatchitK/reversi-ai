@@ -167,3 +167,11 @@ h1 { font-size: 2rem; margin-bottom: 15px; color: var(--primary); }
 
 .btn:hover { background-color: #38bdf8; }
 .btn:active { transform: scale(0.98); }
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #ff4444;
+}
