@@ -188,6 +188,9 @@ class HistoryTable:
 TT = TranspositionTable()
 HISTORY = HistoryTable()
 
+TT_PATTERN = TranspositionTable()
+HISTORY_PATTERN = HistoryTable()
+
 def alphabeta(P, O, depth, alpha, beta, phase, start_time, time_limit):
     """PVS (Principal Variation Search) with Alpha-Beta pruning, move ordering, and TT."""
     if time.time() - start_time > time_limit:
@@ -349,7 +352,7 @@ def alphabeta_pattern(P, O, depth, alpha, beta, phase, start_time, time_limit):
     if time.time() - start_time > time_limit:
         raise TimeoutError
 
-    tt_entry = TT.lookup(P, O)
+    tt_entry = TT_PATTERN.lookup(P, O)
     tt_move = None
     if tt_entry and tt_entry[0] >= depth:
         tt_flag = tt_entry[1]
@@ -375,7 +378,8 @@ def alphabeta_pattern(P, O, depth, alpha, beta, phase, start_time, time_limit):
     temp = moves_bb
     while temp:
         lsb = temp & -temp
-        score = WEIGHTS[(lsb & -lsb).bit_length() - 1 // 8][(lsb & -lsb).bit_length() - 1 % 8] + HISTORY.get_score(lsb)
+        idx = (lsb & -lsb).bit_length() - 1
+        score = WEIGHTS[idx // 8][idx % 8] + HISTORY_PATTERN.get_score(lsb)
         if lsb == tt_move: score = 1000000
         moves_list.append((score, lsb))
         temp &= temp - 1
@@ -402,10 +406,14 @@ def alphabeta_pattern(P, O, depth, alpha, beta, phase, start_time, time_limit):
         if val > alpha:
             alpha = val
             if alpha >= beta:
-                HISTORY.update(move, depth)
+                HISTORY_PATTERN.update(move, depth)
                 break
             
-    TT.store(P, O, depth, EXACT if alpha < beta else (LOWERBOUND if best_val >= beta else UPPERBOUND), best_val, best_move)
+    flag = EXACT
+    if best_val <= original_alpha: flag = UPPERBOUND
+    elif best_val >= beta: flag = LOWERBOUND
+
+    TT_PATTERN.store(P, O, depth, flag, best_val, best_move)
     return best_val, best_move
 
 def get_best_move_pattern(game, player, time_limit=1.5):
