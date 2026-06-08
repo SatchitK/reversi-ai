@@ -2,7 +2,9 @@ const EMPTY = 0, BLACK = 1, WHITE = 2;
 const DIRS = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
 
 let board = [];
-let currentPlayer = BLACK;
+let currentPlayer = BLACK; // Black always starts in Reversi
+let userColor = BLACK;
+let aiColor = WHITE;
 let isAiThinking = false;
 
 const boardEl = document.getElementById('board');
@@ -25,6 +27,10 @@ const initGame = () => {
     currentPlayer = BLACK;
     isAiThinking = false;
     render();
+
+    if (userColor === WHITE) {
+        setTimeout(playAI, 500);
+    }
 };
 
 const isLegalMove = (r, c, player) => {
@@ -77,7 +83,7 @@ const applyMove = (r, c, player) => {
 
 const render = () => {
     boardEl.innerHTML = '';
-    const validMoves = (currentPlayer === BLACK && !isAiThinking) ? getMoves(BLACK) : [];
+    const validMoves = (currentPlayer === userColor && !isAiThinking) ? getMoves(userColor) : [];
     let counts = { [BLACK]: 0, [WHITE]: 0 };
 
     for (let r = 0; r < 8; r++) {
@@ -111,26 +117,28 @@ const render = () => {
     const whiteMoves = getMoves(WHITE).length;
 
     if (!blackMoves && !whiteMoves) {
-        const diff = counts[BLACK] - counts[WHITE];
-        statusMsg.textContent = diff > 0 ? "You Win!" : diff < 0 ? "AI Wins!" : "Tie Game!";
+        const userScore = counts[userColor];
+        const aiScore = counts[aiColor];
+        statusMsg.textContent = userScore > aiScore ? "You Win!" : aiScore > userScore ? "AI Wins!" : "Tie Game!";
     } else if (isAiThinking) {
-        statusMsg.textContent = "Thinking...";
+        statusMsg.textContent = "AI is thinking...";
     } else {
-        statusMsg.textContent = currentPlayer === BLACK ? "Your move" : "AI's move";
+        statusMsg.textContent = currentPlayer === userColor ? "Your move" : "AI's move";
     }
 };
 
 const handleMove = async (r, c) => {
-    if (isAiThinking || currentPlayer !== BLACK || !applyMove(r, c, BLACK)) return;
+    if (isAiThinking || currentPlayer !== userColor || !applyMove(r, c, userColor)) return;
     
-    currentPlayer = WHITE;
+    currentPlayer = aiColor;
     render();
     setTimeout(playAI, 50);
 };
 
 const playAI = async () => {
-    if (!getMoves(WHITE).length) {
-        currentPlayer = BLACK;
+    const moves = getMoves(aiColor);
+    if (!moves.length) {
+        currentPlayer = userColor;
         render();
         return;
     }
@@ -142,22 +150,22 @@ const playAI = async () => {
         const res = await fetch('/api/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ board, player: WHITE })
+            body: JSON.stringify({ board, player: aiColor })
         });
         const { move } = await res.json();
-        if (move) applyMove(move[0], move[1], WHITE);
+        if (move) applyMove(move[0], move[1], aiColor);
     } catch (err) {
         console.error("AI Error:", err);
         statusMsg.textContent = "Connection error";
     }
 
     isAiThinking = false;
-    currentPlayer = BLACK;
+    currentPlayer = userColor;
     
-    if (!getMoves(BLACK).length && getMoves(WHITE).length) {
+    if (!getMoves(userColor).length && getMoves(aiColor).length) {
         render();
         setTimeout(() => {
-            currentPlayer = WHITE;
+            currentPlayer = aiColor;
             playAI();
         }, 1000);
     } else {
@@ -165,5 +173,25 @@ const playAI = async () => {
     }
 };
 
+// UI Handlers
 document.getElementById('restart-btn').onclick = initGame;
+
+document.getElementById('select-black').onclick = () => {
+    if (userColor === BLACK) return;
+    userColor = BLACK;
+    aiColor = WHITE;
+    document.getElementById('select-black').classList.add('active');
+    document.getElementById('select-white').classList.remove('active');
+    initGame();
+};
+
+document.getElementById('select-white').onclick = () => {
+    if (userColor === WHITE) return;
+    userColor = WHITE;
+    aiColor = BLACK;
+    document.getElementById('select-white').classList.add('active');
+    document.getElementById('select-black').classList.remove('active');
+    initGame();
+};
+
 initGame();

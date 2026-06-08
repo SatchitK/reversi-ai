@@ -120,7 +120,37 @@ h1 { font-size: 2rem; margin-bottom: 15px; color: var(--primary); }
 
 .controls {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.color-selection {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 15px;
+    border-radius: 8px;
+}
+
+.color-selection span {
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.color-btn {
+    padding: 6px 15px;
+    font-size: 0.9rem;
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.color-btn.active {
+    background: var(--primary);
+    color: #000;
+    border-color: var(--primary);
 }
 
 .btn {
