@@ -173,7 +173,7 @@ const render = () => {
     scoreDivs[WHITE].classList.toggle('active', currentPlayer === WHITE);
 
     if (gameState === 'setup') {
-        statusMsg.textContent = "Select options and press Start";
+        statusMsg.textContent = "Select options & Start";
         return;
     }
 
