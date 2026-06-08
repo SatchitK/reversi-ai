@@ -1,4 +1,5 @@
 const EMPTY = 0, BLACK = 1, WHITE = 2;
+const START_GP = 'gp', START_NORMAL = 'normal';
 const DIRS = [[0,1],[0,-1],[1,0],[-1,0],[1,1],[1,-1],[-1,1],[-1,-1]];
 
 let board = [];
@@ -6,6 +7,8 @@ let currentPlayer = BLACK; // Black always starts in Reversi
 let userColor = BLACK;
 let aiColor = WHITE;
 let isAiThinking = false;
+let startMode = START_GP;
+let gameStarted = false;
 
 const boardEl = document.getElementById('board');
 const statusMsg = document.getElementById('status-message');
@@ -20,15 +23,29 @@ const scoreDivs = {
 
 const initGame = () => {
     board = Array.from({ length: 8 }, () => Array(8).fill(EMPTY));
-    board[3][3] = BLACK;
-    board[4][4] = BLACK;
-    board[3][4] = WHITE;
-    board[4][3] = WHITE;
+    if (startMode === START_GP) {
+        board[3][3] = BLACK;
+        board[4][4] = BLACK;
+        board[3][4] = WHITE;
+        board[4][3] = WHITE;
+    } else {
+        board[3][3] = WHITE;
+        board[4][4] = WHITE;
+        board[3][4] = BLACK;
+        board[4][3] = BLACK;
+    }
     currentPlayer = BLACK;
     isAiThinking = false;
+    gameStarted = false;
+    
+    // Enable controls
+    document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = false);
+    
     render();
 
     if (userColor === WHITE) {
+        gameStarted = true;
+        document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
         setTimeout(playAI, 500);
     }
 };
@@ -130,6 +147,11 @@ const render = () => {
 const handleMove = async (r, c) => {
     if (isAiThinking || currentPlayer !== userColor || !applyMove(r, c, userColor)) return;
     
+    if (!gameStarted) {
+        gameStarted = true;
+        document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
+    }
+
     currentPlayer = aiColor;
     render();
     setTimeout(playAI, 50);
@@ -177,7 +199,7 @@ const playAI = async () => {
 document.getElementById('restart-btn').onclick = initGame;
 
 document.getElementById('select-black').onclick = () => {
-    if (userColor === BLACK) return;
+    if (userColor === BLACK || gameStarted) return;
     userColor = BLACK;
     aiColor = WHITE;
     document.getElementById('select-black').classList.add('active');
@@ -186,11 +208,27 @@ document.getElementById('select-black').onclick = () => {
 };
 
 document.getElementById('select-white').onclick = () => {
-    if (userColor === WHITE) return;
+    if (userColor === WHITE || gameStarted) return;
     userColor = WHITE;
     aiColor = BLACK;
     document.getElementById('select-white').classList.add('active');
     document.getElementById('select-black').classList.remove('active');
+    initGame();
+};
+
+document.getElementById('start-gp').onclick = () => {
+    if (startMode === START_GP || gameStarted) return;
+    startMode = START_GP;
+    document.getElementById('start-gp').classList.add('active');
+    document.getElementById('start-normal').classList.remove('active');
+    initGame();
+};
+
+document.getElementById('start-normal').onclick = () => {
+    if (startMode === START_NORMAL || gameStarted) return;
+    startMode = START_NORMAL;
+    document.getElementById('start-normal').classList.add('active');
+    document.getElementById('start-gp').classList.remove('active');
     initGame();
 };
 

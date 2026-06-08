@@ -122,35 +122,53 @@ h1 { font-size: 2rem; margin-bottom: 15px; color: var(--primary); }
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
 }
 
-.color-selection {
+.selection-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    width: 100%;
     background: rgba(255, 255, 255, 0.05);
     padding: 8px 15px;
-    border-radius: 8px;
+    border-radius: 12px;
 }
 
-.color-selection span {
+.selection-group span {
     font-size: 0.9rem;
     font-weight: 500;
 }
 
-.color-btn {
-    padding: 6px 15px;
-    font-size: 0.9rem;
+.button-group {
+    display: flex;
+    gap: 8px;
+}
+
+.color-btn, .setting-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
     background: transparent;
     color: var(--text-color);
     border: 1px solid rgba(255, 255, 255, 0.2);
+    min-width: 80px;
 }
 
-.color-btn.active {
+.color-btn.active, .setting-btn.active {
     background: var(--primary);
     color: #000;
     border-color: var(--primary);
+}
+
+.btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+    filter: grayscale(1);
+}
+
+.primary-btn {
+    width: 100%;
+    margin-top: 5px;
 }
 
 .btn {
