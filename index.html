@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reversi Master AI</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Reversi</h1>
+            <div class="status-bar">
+                <div class="score black-score active"><div class="disc black"></div> <span id="black-score">2</span></div>
+                <div class="status-message" id="status-message">Your turn</div>
+                <div class="score white-score"><div class="disc white"></div> <span id="white-score">2</span></div>
+            </div>
+        </header>
+
+        <main>
+            <div id="board" class="board"></div>
+        </main>
+
+        <div class="controls">
+            <button id="restart-btn" class="btn">Restart Game</button>
+        </div>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
