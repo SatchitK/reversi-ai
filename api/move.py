@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 sys.path.append(str(Path(__file__).parent.parent))
 
 from reversi_logic import ReversiGame, WHITE
-from reversi_ai import get_best_move
+from reversi_ai import get_best_move, get_best_move_pattern
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -17,8 +17,12 @@ class handler(BaseHTTPRequestHandler):
         game = ReversiGame()
         game.board = data.get('board', game.board)
         player = data.get('player', WHITE)
+        engine = data.get('aiEngine', 'standard')
         
-        move = get_best_move(game, player, time_limit=1.5)
+        if engine == 'pattern':
+            move = get_best_move_pattern(game, player, time_limit=1.5)
+        else:
+            move = get_best_move(game, player, time_limit=1.5)
         
         self.send_response(200)
         self.send_header('Content-type', 'application/json')

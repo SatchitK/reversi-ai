@@ -8,6 +8,7 @@ let userColor = BLACK;
 let aiColor = WHITE;
 let isAiThinking = false;
 let startMode = START_GP;
+let aiEngine = 'standard';
 let gameState = 'setup'; // 'setup' or 'playing'
 let lastMove = null; // Track the last move made [r, c]
 
@@ -73,7 +74,7 @@ const initGame = () => {
     lastMove = null;
     
     // UI state
-    document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = false);
+    document.querySelectorAll('.color-btn, .setting-btn, .engine-btn').forEach(btn => btn.disabled = false);
     restartBtn.textContent = 'Start Game';
     boardEl.classList.add('setup');
     
@@ -82,7 +83,7 @@ const initGame = () => {
 
 const startGame = () => {
     gameState = 'playing';
-    document.querySelectorAll('.color-btn, .setting-btn').forEach(btn => btn.disabled = true);
+    document.querySelectorAll('.color-btn, .setting-btn, .engine-btn').forEach(btn => btn.disabled = true);
     restartBtn.textContent = 'Restart Game';
     boardEl.classList.remove('setup');
     
@@ -217,7 +218,7 @@ const playAI = async () => {
         const res = await fetch('/api/move', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ board, player: aiColor })
+            body: JSON.stringify({ board, player: aiColor, aiEngine })
         });
         const { move } = await res.json();
         if (move && gameState === 'playing') {
@@ -288,6 +289,20 @@ document.getElementById('start-normal').onclick = () => {
     document.getElementById('start-normal').classList.add('active');
     document.getElementById('start-gp').classList.remove('active');
     initGame();
+};
+
+document.getElementById('engine-standard').onclick = () => {
+    if (aiEngine === 'standard' || gameState === 'playing') return;
+    aiEngine = 'standard';
+    document.getElementById('engine-standard').classList.add('active');
+    document.getElementById('engine-pattern').classList.remove('active');
+};
+
+document.getElementById('engine-pattern').onclick = () => {
+    if (aiEngine === 'pattern' || gameState === 'playing') return;
+    aiEngine = 'pattern';
+    document.getElementById('engine-pattern').classList.add('active');
+    document.getElementById('engine-standard').classList.remove('active');
 };
 
 initGame();

@@ -156,7 +156,7 @@ h1 { font-size: 2rem; margin-bottom: 15px; color: var(--primary); }
     gap: 8px;
 }
 
-.color-btn, .setting-btn {
+.color-btn, .setting-btn, .engine-btn {
     padding: 6px 12px;
     font-size: 0.85rem;
     background: transparent;
@@ -167,7 +167,7 @@ h1 { font-size: 2rem; margin-bottom: 15px; color: var(--primary); }
     cursor: pointer;
 }
 
-.color-btn.active, .setting-btn.active {
+.color-btn.active, .setting-btn.active, .engine-btn.active {
     background: var(--primary);
     color: #000;
     border-color: var(--primary);
