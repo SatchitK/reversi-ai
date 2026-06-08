@@ -9,7 +9,7 @@ from tkinter import messagebox
 import threading
 import time
 from reversi_logic import ReversiGame, BLACK, WHITE, EMPTY
-from reversi_ai import get_best_move
+from reversi_ai import get_best_move, get_best_move_v2, get_best_move_pattern
 
 CELL_SIZE = 60
 BOARD_MARGIN = 20
@@ -25,11 +25,33 @@ class ReversiGUI:
         self.ai_color = WHITE
         self.is_ai_thinking = False
         
+        # AI selection: "Standard", "Pattern V1", "Pattern V2 (Advanced)"
+        self.ai_mode = tk.StringVar(value="Standard")
+        # Time selection: 1.0, 3.0, 5.0, 10.0
+        self.thinking_time = tk.DoubleVar(value=1.5)
+        
         self.setup_ui()
         self.ask_player_color()
         self.draw_board()
 
     def setup_ui(self):
+        # Create menu for AI selection and Search settings
+        self.menubar = tk.Menu(self.root)
+        self.root.config(menu=self.menubar)
+        
+        self.ai_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="AI Engine", menu=self.ai_menu)
+        self.ai_menu.add_radiobutton(label="Standard (Phase-Based)", variable=self.ai_mode, value="Standard")
+        self.ai_menu.add_radiobutton(label="Pattern V1 (Basic)", variable=self.ai_mode, value="Pattern V1")
+        self.ai_menu.add_radiobutton(label="Pattern V2 (Advanced)", variable=self.ai_mode, value="Pattern V2")
+
+        self.search_menu = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Search Time", menu=self.search_menu)
+        self.search_menu.add_radiobutton(label="Quick (0.5s)", variable=self.thinking_time, value=0.5)
+        self.search_menu.add_radiobutton(label="Normal (1.5s)", variable=self.thinking_time, value=1.5)
+        self.search_menu.add_radiobutton(label="Deep (5.0s)", variable=self.thinking_time, value=5.0)
+        self.search_menu.add_radiobutton(label="Ultra (15.0s)", variable=self.thinking_time, value=15.0)
+
         self.canvas = tk.Canvas(self.root, width=CANVAS_SIZE, height=CANVAS_SIZE, bg="#2e7d32")
         self.canvas.pack(pady=10)
         self.canvas.bind("<Button-1>", self.handle_click)
@@ -147,8 +169,18 @@ class ReversiGUI:
 
     def ai_turn_worker(self):
         try:
-            # AI calculation
-            move = get_best_move(self.game, self.ai_color)
+            # AI calculation based on selected mode and time
+            mode = self.ai_mode.get()
+            t_limit = self.thinking_time.get()
+            print(f"AI Thinking using mode: {mode}, Time: {t_limit}s")
+            
+            if mode == "Standard":
+                move = get_best_move(self.game, self.ai_color, time_limit=t_limit)
+            elif mode == "Pattern V1":
+                move = get_best_move_pattern(self.game, self.ai_color, time_limit=t_limit)
+            else: # Pattern V2
+                move = get_best_move_v2(self.game, self.ai_color, time_limit=t_limit)
+                
             time.sleep(0.2) # Small delay for visual flow
             self.root.after(0, self.complete_ai_turn, move)
         except Exception as e:
